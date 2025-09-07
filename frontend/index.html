@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horo - AI Business Assistant MVP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        .citation-badge {
+            @apply inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-xs font-medium cursor-pointer hover:bg-blue-200 transition-colors mb-1 mr-1;
+        }
+
+        .knowledge-gap {
+            @apply bg-amber-50 border border-amber-200 rounded-lg p-4 mt-3;
+        }
+
+        .confidence-bar {
+            @apply h-1 w-full rounded-full bg-gray-200 overflow-hidden;
+        }
+
+        .confidence-fill {
+            @apply h-full transition-all duration-300;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50" x-data="horoApp()">
+    <div class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200 px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                        <i data-lucide="brain-circuit" class="w-5 h-5 text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-semibold">Horo RAG MVP</h1>
+                        <p class="text-sm text-gray-500">AI Business Assistant Demo</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <div class="text-sm text-gray-600">
+                        <span x-text="documents.length"></span> documents
+                    </div>
+                    <div class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                        Tenant: <span x-text="tenantId"></span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 flex">
+            <!-- Sidebar -->
+            <aside class="w-80 bg-white border-r border-gray-200 p-4 overflow-y-auto">
+                <!-- Upload Area -->
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mb-6 cursor-pointer hover:border-blue-400 transition-colors"
+                    :class="uploading ? 'opacity-50 cursor-not-allowed' : ''"
+                    @click="!uploading && $refs.fileInput.click()">
+
+                    <div x-show="!uploading">
+                        <i data-lucide="upload-cloud" class="w-8 h-8 text-gray-400 mx-auto mb-2"></i>
+                        <p class="text-sm font-medium text-gray-700">Upload Documents</p>
+                        <p class="text-xs text-gray-500">TXT files only for MVP</p>
+                    </div>
+
+                    <div x-show="uploading" class="flex flex-col items-center">
+                        <div
+                            class="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mb-2">
+                        </div>
+                        <p class="text-sm text-blue-600">Processing...</p>
+                    </div>
+
+                    <input type="file" x-ref="fileInput" @change="uploadFile($event)" accept=".txt,.pdf,.doc,.docx,.rtf"
+                        class="hidden" :disabled="uploading">
+                </div>
+
+                <!-- Documents List -->
+                <div>
+                    <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <i data-lucide="folder-open" class="w-5 h-5"></i>
+                        Your Documents
+                    </h3>
+
+                    <div x-show="documents.length === 0" class="text-center py-12 text-gray-500">
+                        <div class="w-16 h-16 bg-gray-100 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                            <i data-lucide="file-text" class="w-8 h-8 text-gray-400"></i>
+                        </div>
+                        <p class="text-base font-medium">No documents uploaded</p>
+                        <p class="text-sm text-gray-400 mt-1">Upload your first document to get started</p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <template x-for="doc in documents" :key="doc.id">
+                            <div
+                                class="bg-gradient-to-r from-white to-gray-50 rounded-xl p-4 border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" :class="doc.type === 'Policy' ? 'bg-blue-100' : 
+                                                doc.type === 'Handbook' ? 'bg-green-100' :
+                                                doc.type === 'Finance' ? 'bg-yellow-100' : 'bg-gray-100'">
+                                        <i data-lucide="file-text" class="w-5 h-5" :class="doc.type === 'Policy' ? 'text-blue-600' : 
+                                                  doc.type === 'Handbook' ? 'text-green-600' :
+                                                  doc.type === 'Finance' ? 'text-yellow-600' : 'text-gray-600'"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-semibold text-gray-800 truncate" x-text="doc.name"></p>
+                                        <div class="flex items-center gap-3 mt-1">
+                                            <span
+                                                class="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg"
+                                                :class="doc.type === 'Policy' ? 'bg-blue-100 text-blue-700' : 
+                                                         doc.type === 'Handbook' ? 'bg-green-100 text-green-700' :
+                                                         doc.type === 'Finance' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'">
+                                                <div class="w-2 h-2 rounded-full" :class="doc.type === 'Policy' ? 'bg-blue-500' : 
+                                                            doc.type === 'Handbook' ? 'bg-green-500' :
+                                                            doc.type === 'Finance' ? 'bg-yellow-500' : 'bg-gray-500'">
+                                                </div>
+                                                <span x-text="doc.type"></span>
+                                            </span>
+                                            <span class="text-xs text-gray-500" x-text="doc.pages + ' pages'"></span>
+                                        </div>
+                                    </div>
+                                    <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse" title="Ready"></div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Chat Area -->
+            <main class="flex-1 flex flex-col">
+                <!-- Messages -->
+                <div class="flex-1 overflow-y-auto p-8" x-ref="messagesContainer">
+                    <div class="max-w-4xl mx-auto space-y-6">
+                        <template x-for="message in messages" :key="message.id">
+                            <div class="flex gap-4" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
+                                <!-- Avatar -->
+                                <div x-show="message.role === 'assistant'"
+                                    class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="bot" class="w-4 h-4 text-white"></i>
+                                </div>
+
+                                <!-- Message Content -->
+                                <div class="max-w-2xl rounded-lg p-4 shadow-sm"
+                                    :class="message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200'">
+
+                                    <!-- Confidence Bar (Assistant only) -->
+                                    <div x-show="message.role === 'assistant' && message.confidence !== undefined"
+                                        class="mb-3">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="text-xs text-gray-500">Confidence:</span>
+                                            <span class="text-xs font-medium"
+                                                x-text="Math.round(message.confidence * 100) + '%'"></span>
+                                        </div>
+                                        <div class="confidence-bar">
+                                            <div class="confidence-fill" :class="message.confidence >= 0.8 ? 'bg-green-500' : 
+                                                        message.confidence >= 0.5 ? 'bg-yellow-500' : 'bg-red-500'"
+                                                :style="`width: ${message.confidence * 100}%`"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Message Text -->
+                                    <div x-html="formatMessage(message.content)" class="whitespace-pre-wrap"></div>
+
+                                    <!-- Answer Summary (if available) -->
+                                    <div x-show="message.answer && message.answer !== message.content"
+                                        class="mt-3 p-3 bg-gray-50 rounded-lg border-l-4 border-blue-500">
+                                        <p class="text-sm font-medium text-gray-700 mb-1">Answer:</p>
+                                        <p class="text-gray-800" x-text="message.answer"></p>
+                                    </div>
+
+                                    <!-- Citations (only show if no knowledge gap) -->
+                                    <div x-show="message.citations && message.citations.length > 0 && !message.has_knowledge_gap"
+                                        class="mt-4">
+                                        <p class="text-sm font-medium text-gray-600 mb-2">Sources:</p>
+                                        <div class="space-y-2">
+                                            <template x-for="(citation, index) in message.citations"
+                                                :key="citation.document + citation.page + index">
+                                                <div class="flex items-center gap-2 text-sm">
+                                                    <span class="w-1 h-1 bg-gray-400 rounded-full flex-shrink-0"></span>
+                                                    <i data-lucide="file-text"
+                                                        class="w-4 h-4 text-gray-500 flex-shrink-0"></i>
+                                                    <span class="cursor-pointer hover:text-blue-600"
+                                                        @click="highlightCitation(citation)">
+                                                        <span x-text="citation.document"></span> (p.<span
+                                                            x-text="citation.page"></span>)
+                                                        <span class="text-xs text-gray-500"
+                                                            x-text="Math.round(citation.confidence * 100) + '%'"></span>
+                                                    </span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+
+                                    <!-- Knowledge Gap -->
+                                    <div x-show="message.has_knowledge_gap" class="knowledge-gap">
+                                        <div class="flex items-start gap-2">
+                                            <i data-lucide="help-circle"
+                                                class="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0"></i>
+                                            <div>
+                                                <p class="text-sm font-medium text-amber-800">Missing Information</p>
+                                                <p class="text-sm text-amber-700 mt-1">
+                                                    Try uploading:
+                                                    <template x-for="(suggestion, index) in (message.suggestions || [])"
+                                                        :key="suggestion">
+                                                        <span>
+                                                            <span x-text="suggestion"></span><span
+                                                                x-show="index < (message.suggestions || []).length - 1">,
+                                                            </span>
+                                                        </span>
+                                                    </template>
+                                                </p>
+                                                <button @click="$refs.fileInput.click()"
+                                                    class="text-xs text-amber-600 underline mt-2 hover:text-amber-800">
+                                                    Upload document
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- User Avatar -->
+                                <div x-show="message.role === 'user'"
+                                    class="w-8 h-8 bg-gray-400 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="user" class="w-4 h-4 text-white"></i>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="border-t border-gray-200 p-4 bg-white">
+                    <form @submit.prevent="sendMessage" class="max-w-4xl mx-auto">
+                        <div class="flex gap-3">
+                            <input type="text" x-model="currentQuestion"
+                                placeholder="Ask about your business documents..."
+                                class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                :disabled="processing" required>
+                            <button type="submit"
+                                class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                                :disabled="processing || !currentQuestion.trim()">
+                                <span x-show="!processing">
+                                    <i data-lucide="send" class="w-4 h-4"></i>
+                                </span>
+                                <span x-show="processing" class="animate-spin">
+                                    <i data-lucide="loader-2" class="w-4 h-4"></i>
+                                </span>
+                            </button>
+                        </div>
+
+                        <!-- Quick Questions -->
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            <button type="button" @click="currentQuestion = 'What is our loan policy?'"
+                                class="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200">
+                                Loan Policy
+                            </button>
+                            <button type="button" @click="currentQuestion = 'What are our onboarding steps?'"
+                                class="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200">
+                                Onboarding Steps
+                            </button>
+                            <button type="button" @click="currentQuestion = 'What is our CAC?'"
+                                class="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200">
+                                Customer Acquisition Cost
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        function horoApp() {
+            return {
+                tenantId: 'demo',
+                documents: [],
+                messages: [
+                    {
+                        id: 1,
+                        role: 'assistant',
+                        content: 'Hello! I\'m Horo, your AI business assistant. Upload your documents and ask me anything about them.',
+                        confidence: 1.0
+                    }
+                ],
+                currentQuestion: '',
+                processing: false,
+                uploading: false,
+
+                init() {
+                    this.loadDocuments();
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                async loadDocuments() {
+                    try {
+                        const response = await fetch('http://localhost:8000/documents', {
+                            headers: { 'X-Tenant-ID': this.tenantId }
+                        });
+                        if (response.ok) {
+                            this.documents = await response.json();
+                        }
+                    } catch (error) {
+                        console.error('Failed to load documents:', error);
+                    }
+                },
+
+                async uploadFile(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    console.log('Uploading file:', file.name, file.type);
+                    this.uploading = true;
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    try {
+                        console.log('Making request to:', 'http://localhost:8000/upload');
+                        const response = await fetch('http://localhost:8000/upload', {
+                            method: 'POST',
+                            headers: { 'X-Tenant-ID': this.tenantId },
+                            body: formData
+                        });
+
+                        console.log('Response status:', response.status);
+                        if (response.ok) {
+                            const result = await response.json();
+                            console.log('Upload result:', result);
+                            await this.loadDocuments();
+                            this.addMessage('assistant', `Document "${file.name}" uploaded successfully! You can now ask questions about it.`, { confidence: 1.0 });
+                            this.$nextTick(() => lucide.createIcons());
+                        } else {
+                            const error = await response.json();
+                            console.error('Upload error response:', error);
+                            throw new Error(error.detail || 'Upload failed');
+                        }
+                    } catch (error) {
+                        console.error('Upload error:', error);
+                        this.addMessage('assistant', `Upload failed: ${error.message}`, { confidence: 0.0 });
+                    } finally {
+                        this.uploading = false;
+                        event.target.value = '';
+                        this.$nextTick(() => lucide.createIcons());
+                    }
+                },
+
+                async sendMessage() {
+                    if (this.processing || !this.currentQuestion.trim()) return;
+
+                    const question = this.currentQuestion;
+                    this.currentQuestion = '';
+
+                    this.addMessage('user', question);
+                    this.processing = true;
+
+                    try {
+                        const response = await fetch('http://localhost:8000/query', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Tenant-ID': this.tenantId
+                            },
+                            body: JSON.stringify({
+                                tenant_id: this.tenantId,
+                                question: question
+                            })
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.addMessage('assistant', data.answer, data);
+                        } else {
+                            throw new Error('Query failed');
+                        }
+                    } catch (error) {
+                        this.addMessage('assistant', 'Sorry, I encountered an error. Please try again.', { confidence: 0.0 });
+                    } finally {
+                        this.processing = false;
+                        this.$nextTick(() => lucide.createIcons());
+                    }
+                },
+
+                addMessage(role, content, data = {}) {
+                    this.messages.push({
+                        id: Date.now(),
+                        role,
+                        content,
+                        ...data
+                    });
+                    this.scrollToBottom();
+                },
+
+                formatMessage(content) {
+                    return content.replace(/\n/g, '<br>');
+                },
+
+                highlightCitation(citation) {
+                    alert(`Source: ${citation.document}, Page: ${citation.page}, Type: ${citation.document_type}`);
+                },
+
+                scrollToBottom() {
+                    this.$nextTick(() => {
+                        this.$refs.messagesContainer.scrollTop = this.$refs.messagesContainer.scrollHeight;
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
