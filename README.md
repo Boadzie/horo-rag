@@ -1,6 +1,8 @@
 # Horo RAG MVP
 
-A Retrieval-Augmented Generation (RAG) system for business document Q&A with proper citations and knowledge gap detection. Built as a demonstration of AI-powered document assistance for business founders.
+![banner](banner.png)
+
+> A Retrieval-Augmented Generation (RAG) system for business document Q&A with proper citations and knowledge gap detection. Built as a demonstration of AI-powered document assistance for business founders.
 
 ## Features
 
